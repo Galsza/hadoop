@@ -70,6 +70,8 @@ import org.apache.hadoop.mapred.lib.NullOutputFormat;
 import org.apache.hadoop.mapreduce.Cluster;
 import org.apache.hadoop.mapreduce.JobSubmissionFiles;
 import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.security.TokenCache;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -490,6 +492,11 @@ public class HadoopArchives implements Tool {
           + " should be a directory but is a file");
     }
     conf.set(DST_DIR_LABEL, outputPath.toString());
+    Credentials credentials = new Credentials();
+    Path[] allPaths = new Path[] {parentPath, dest};
+    TokenCache.obtainTokensForNamenodes(credentials, allPaths, conf);
+    conf.setCredentials(credentials);
+
     Path stagingArea;
     try {
       stagingArea = JobSubmissionFiles.getStagingDir(new Cluster(conf), 
@@ -501,11 +508,11 @@ public class HadoopArchives implements Tool {
         NAME+"_"+Integer.toString(new Random().nextInt(Integer.MAX_VALUE), 36));
     FsPermission mapredSysPerms = 
       new FsPermission(JobSubmissionFiles.JOB_DIR_PERMISSION);
-    FileSystem.mkdirs(jobDirectory.getFileSystem(conf), jobDirectory,
-                      mapredSysPerms);
+    FileSystem jobfs = jobDirectory.getFileSystem(conf);
+    FileSystem.mkdirs(jobfs, jobDirectory,
+        mapredSysPerms);
     conf.set(JOB_DIR_LABEL, jobDirectory.toString());
     //get a tmp directory for input splits
-    FileSystem jobfs = jobDirectory.getFileSystem(conf);
     Path srcFiles = new Path(jobDirectory, "_har_src_files");
     conf.set(SRC_LIST_LABEL, srcFiles.toString());
     SequenceFile.Writer srcWriter = SequenceFile.createWriter(jobfs, conf,
